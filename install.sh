@@ -179,6 +179,14 @@ install_or_update_cco() {
 		log "Updating existing cco installation..."
 		cd "$CCO_INSTALLATION_DIR"
 
+		# Ensure remote points to the correct fork
+		local current_remote
+		current_remote=$(git remote get-url origin 2>/dev/null || true)
+		if [[ "$current_remote" != *"${GITHUB_REPO}"* ]]; then
+			log "Switching remote from $current_remote to $GITHUB_SSH_URL"
+			git remote set-url origin "$GITHUB_SSH_URL"
+		fi
+
 		# Check for local modifications
 		if ! git diff --quiet HEAD 2>/dev/null; then
 			warn "WARNING: Your cco installation has local modifications."
