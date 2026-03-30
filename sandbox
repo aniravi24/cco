@@ -206,6 +206,30 @@ run_linux() {
 		[[ -e "$p" ]] && args+=(--ro-bind "$p" "$p")
 	done
 
+	# 2b) Allow new file creation in $HOME (needed for Claude's mkdir/rmdir
+	#     lock mechanism and atomic-write temp files), while keeping all
+	#     existing entries read-only unless explicitly whitelisted by --write.
+	args+=(--bind "$HOME" "$HOME")
+	for item in "$HOME"/.* "$HOME"/*; do
+		# Skip . and ..
+		[[ "$item" == "$HOME/." || "$item" == "$HOME/.." ]] && continue
+		# Skip symlinks (they're accessible via the $HOME bind already)
+		# and non-existent entries
+		[[ -L "$item" || ! -e "$item" ]] && continue
+		# Skip paths that are already in the write_paths array
+		local is_writable=false
+		for wp in "${write_paths[@]+"${write_paths[@]}"}"; do
+			if [[ "$item" == "$wp" || "$wp" == "$item"/* || "$item" == "$wp"/* ]]; then
+				is_writable=true
+				break
+			fi
+		done
+		[[ "$is_writable" == true ]] && continue
+		# Skip PWD (already bound writable above)
+		[[ "$item" == "$PWD_ABS" || "$PWD_ABS" == "$item"/* ]] && continue
+		args+=(--ro-bind "$item" "$item")
+	done
+
 	# 3) If safe mode enabled, hide the rest of $HOME by default.
 	if [[ "$safe_mode" == true ]]; then
 		args+=(--tmpfs "$HOME")
